@@ -1,0 +1,19 @@
+[Desktop Entry]
+Comment[en_US]=
+Comment=
+Exec=bash $HOME/xone_install_or_update.sh --debug
+GenericName[en_US]=
+GenericName=
+Icon=preferences-desktop-gaming
+MimeType=
+Name[en_US]=Install⁄Update Xone (DEBUG)
+Name=Install⁄Update Xone (DEBUG)
+Path=
+StartupNotify=false
+Terminal=true
+TerminalOptions=
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
