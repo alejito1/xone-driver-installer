@@ -1,5 +1,9 @@
 # Changelog
 
+### 0.11.0
+
+ - Move to a GitHub repository, functionality is the same as 0.10.0
+
 ### 0.10.0
 
  - Support SteamOS 3.7
