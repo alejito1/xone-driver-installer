@@ -39,3 +39,4 @@ After installation you may need to restart your Deck to get things working. Fail
 1. Switch to [Desktop mode](https://help.steampowered.com/en/faqs/view/671A-4453-E8D2-323C)
 2. Click the Install/Update Xone (DEBUG) icon on your desktop
 3. Please search for an existing [issue](https://github.com/SavageCore/xone-steam-deck-installer/issues) then post a [new](https://github.com/SavageCore/xone-steam-deck-installer/issues/new) one if you can't find it! You can also pop by my [Discord](https://discord.gg/MxMFhsKrZd) and leave a message in #xone-install-script
+4. This script was originally a [Gist](https://gist.github.com/SavageCore/263a3413532bc181c9bb215c8fe6c30d) so you may find some useful information in the comments there too.
