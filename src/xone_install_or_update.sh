@@ -93,7 +93,7 @@ install_xone() {
     eval sudo ./install.sh --release "$REDIRECT"
     echo -e "\e[1mGetting xone firmware...\e[0m"
     echo ""
-    eval sudo xone-get-firmware.sh --skip-disclaimer "$REDIRECT"
+    eval sudo install/firmware.sh --skip-disclaimer "$REDIRECT"
 }
 
 uninstall_xone() {
