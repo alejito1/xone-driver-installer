@@ -34,6 +34,12 @@ After installation you may need to restart your Deck to get things working. Fail
 1. Switch to [Desktop mode](https://help.steampowered.com/en/faqs/view/671A-4453-E8D2-323C)
 2. Click the Install/Update Xone icon on your desktop
 
+# Uninstalling ❌
+
+1. Switch to [Desktop mode](https://help.steampowered.com/en/faqs/view/671A-4453-E8D2-323C)
+2. Launch Konsole
+3. Run `wget -O /tmp/xone_uninstall.sh https://github.com/SavageCore/xone-steam-deck-installer/raw/refs/heads/main/src/xone_uninstall.sh && sh /tmp/xone_uninstall.sh`
+
 # Troubleshooting 🛠️
 
 1. Switch to [Desktop mode](https://help.steampowered.com/en/faqs/view/671A-4453-E8D2-323C)
