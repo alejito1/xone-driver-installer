@@ -1,3 +1,9 @@
+# ⚠️ Semi deprecated
+
+Unless you need Xbox 360 controller support then it's superseded by the driver's own [install script](https://github.com/dlundqvist/xone#steam-decksteamos)
+
+# Donate
+
 Enjoying this script? Consider buying me a beer/coffee!
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/E1E6P7VIQ)
