@@ -12,8 +12,8 @@ XPAD_NOONE_LOCAL_REPO="/home/deck/repos/xpad-noone"
 # dlundqvist is maintaining a fork that contains PRs that have not been merged into the main repo
 # main repo: https://github.com/medusalix/xone
 XONE_REMOTE_REPO="https://github.com/dlundqvist/xone"
-XPAD_NOONE_REMOTE_REPO="https://github.com/medusalix/xpad-noone"
-XPAD_NOONE_VERSION="1.0"
+XPAD_NOONE_REMOTE_REPO="https://github.com/forkymcforkface/xpad-noone"
+XPAD_NOONE_VERSION="0.4"
 
 # DO NOT EDIT BELOW THIS LINE
 KEEP_READ_ONLY="false"
@@ -108,7 +108,7 @@ uninstall_xone() {
 }
 
 install_xpad_noone() {
-    if [ -n "$(dkms status xpad-noone)" ]; then
+    if [ -n "$(dkms status xpad)" ]; then
         if [[ $DEBUG == "true" ]]; then
             echo "xpad-noone is already installed"
         fi
@@ -120,22 +120,14 @@ install_xpad_noone() {
     echo ""
 
     eval sudo modprobe -r xpad "$REDIRECT"
-    eval sudo cp -r "$XPAD_NOONE_LOCAL_REPO" /usr/src/xpad-noone-$XPAD_NOONE_VERSION "$REDIRECT"
-    eval sudo dkms install -m xpad-noone -v $XPAD_NOONE_VERSION "$REDIRECT"
+    eval sudo cp -r "$XPAD_NOONE_LOCAL_REPO" /usr/src/xpad-$XPAD_NOONE_VERSION "$REDIRECT"
+    eval sudo dkms install -m xpad -v $XPAD_NOONE_VERSION "$REDIRECT"
 }
 
 uninstall_xpad_noone() {
-    modules=$(lsmod | grep '^xpad_noone' | cut -d ' ' -f 1 | tr '\n' ' ')
-    version=$XPAD_NOONE_VERSION
-
-    if [ -n "$modules" ]; then
-        # shellcheck disable=SC2086
-        eval sudo modprobe -r -a $modules "$REDIRECT"
-    fi
-
-    if [ -n "$version" ]; then
-        eval sudo dkms remove -m xpad-noone -v "$version" --all "$REDIRECT"
-        sudo rm -rf "/usr/src/xpad-noone-$version"
+    if [ -n "$(dkms status xpad)" ]; then
+        eval sudo dkms remove -m xpad -v "$XPAD_NOONE_VERSION" --all "$REDIRECT"
+        sudo rm -rf "/usr/src/xpad-$XPAD_NOONE_VERSION"
     else
         echo 'Driver is not installed!'
     fi
@@ -466,25 +458,58 @@ fi
 
 # Does the xpad-noone local repo folder already exist?
 if [ -d "$XPAD_NOONE_LOCAL_REPO" ]; then
-    # ...if yes, run the uninstall script, and pull down any new updates from the remote repo
-    echo -e "\e[1mChecking for xpad-noone updates...\e[0m"
-    echo ""
+    # ...if yes, check if it's the old medusalix repo
     cd $XPAD_NOONE_LOCAL_REPO || {
         echo "Failed to cd into xpad-noone repo. Aborting..."
         read -n 1 -s -r -p "Press any key to exit"
         exit 1
     }
 
-    # Ensure the repo is in a clean state for git pull
-    eval git reset --hard "$REDIRECT"
-    # Check for updates with git pull, and if there are updates, uninstall
-    git_output=$(eval git pull)
+    current_remote=$(git remote get-url origin)
+    old_remote="https://github.com/medusalix/xpad-noone"
 
-    if [[ $git_output != *"Already up to date."* ]]; then
-        uninstall_xpad_noone
+    if [[ "$current_remote" == "$old_remote" ]]; then
+        echo ""
+        echo -e "\e[1mDeleting the old xpad-noone repo and cloning the forkymcforkface fork...\e[0m"
+        echo ""
+        # Uninstall the old xpad-noone driver
+        modules=$(lsmod | grep '^xpad_noone' | cut -d ' ' -f 1 | tr '\n' ' ')
+        if [ -n "$modules" ]; then
+            eval sudo modprobe -r -a $modules "$REDIRECT"
+        fi
+        if [ -n "$(dkms status xpad-noone)" ]; then
+            eval sudo dkms remove -m xpad-noone -v "1.0" --all "$REDIRECT"
+            sudo rm -rf "/usr/src/xpad-noone-1.0"
+        fi
+        # Remove the old repo
+        cd "/home/deck/repos" || {
+            echo "Failed to cd into /home/deck/repos. Aborting..."
+            read -n 1 -s -r -p "Press any key to exit"
+            exit 1
+        }
+        rm -rf "$XPAD_NOONE_LOCAL_REPO"
+        # Clone the new repo
+        echo -e "\e[1mCloning xpad-noone...\e[0m"
+        echo ""
+        eval git clone $XPAD_NOONE_REMOTE_REPO $XPAD_NOONE_LOCAL_REPO "$REDIRECT"
+        cd "$XPAD_NOONE_LOCAL_REPO" || {
+            echo "Failed to cd into newly cloned repo. Aborting..."
+            read -n 1 -s -r -p "Press any key to exit"
+            exit 1
+        }
         XPAD_HAS_UPDATED=true
     else
-        echo "No updates available"
+        # Check for updates with git pull
+        echo -e "\e[1mChecking for xpad-noone updates...\e[0m"
+        echo ""
+        eval git reset --hard "$REDIRECT"
+        git_output=$(eval git pull)
+        if [[ $git_output != *"Already up to date."* ]]; then
+            uninstall_xpad_noone
+            XPAD_HAS_UPDATED=true
+        else
+            echo "No updates available"
+        fi
     fi
 else
     # ...if not, clone the repo
@@ -535,10 +560,10 @@ if ! lsmod | grep -q xone_dongle; then
 fi
 
 # Using lsmod check if xpad_noone is loaded, if not, load it
-if ! lsmod | grep -q xpad_noone; then
-    load_cmd="sudo modprobe -q xpad-noone"
+if ! lsmod | grep -q xpad; then
+    load_cmd="sudo modprobe -q xpad"
     if [[ $DEBUG == "true" ]]; then
-        load_cmd="sudo modprobe xpad-noone"
+        load_cmd="sudo modprobe xpad"
     fi
 
     # Load the xpad-noone module, if it exists
@@ -549,7 +574,7 @@ if ! lsmod | grep -q xpad_noone; then
     fi
 
     sudo touch /etc/modules-load.d/xpad-noone.conf
-    echo "xpad-noone" | sudo tee /etc/modules-load.d/xpad-noone.conf >/dev/null 2>&1
+    echo "xpad" | sudo tee /etc/modules-load.d/xpad-noone.conf >/dev/null 2>&1
 fi
 
 # Re enable steamos-readonly if it was enabled before
