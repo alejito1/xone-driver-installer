@@ -488,6 +488,7 @@ if [ -d "$XPAD_NOONE_LOCAL_REPO" ]; then
             exit 1
         }
         rm -rf "$XPAD_NOONE_LOCAL_REPO"
+        rm -f /etc/modules-load.d/xpad-noone.conf
         # Clone the new repo
         echo -e "\e[1mCloning xpad-noone...\e[0m"
         echo ""
@@ -566,15 +567,15 @@ if ! lsmod | grep -q xpad; then
         load_cmd="sudo modprobe xpad"
     fi
 
-    # Load the xpad-noone module, if it exists
+    # Load the xpad module, if it exists
     if ! $load_cmd; then
-        echo "Failed to load xpad-noone module. Aborting..."
+        echo "Failed to load xpad module. Aborting..."
         read -n 1 -s -r -p "Press any key to exit"
         exit 1
     fi
 
-    sudo touch /etc/modules-load.d/xpad-noone.conf
-    echo "xpad" | sudo tee /etc/modules-load.d/xpad-noone.conf >/dev/null 2>&1
+    sudo touch /etc/modules-load.d/xpad.conf
+    echo "xpad" | sudo tee /etc/modules-load.d/xpad.conf >/dev/null 2>&1
 fi
 
 # Re enable steamos-readonly if it was enabled before
