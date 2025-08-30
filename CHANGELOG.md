@@ -1,5 +1,9 @@
 # Changelog
 
+### 0.12.0
+
+ - Update xpad-noone to use the new fork (https://github.com/forkymcforkface/xpad-noone)
+
 ### 0.11.1
 
  - Fix firmware installation script path
