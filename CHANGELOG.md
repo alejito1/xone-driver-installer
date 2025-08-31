@@ -1,5 +1,9 @@
 # Changelog
 
+### 0.12.1
+
+ - Fix autoloading of new xpad-noone
+
 ### 0.12.0
 
  - Update xpad-noone to use the new fork (https://github.com/forkymcforkface/xpad-noone)
