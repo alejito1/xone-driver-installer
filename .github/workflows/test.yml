@@ -1,0 +1,30 @@
+name: ShellCheck
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+        # Scan all shell scripts in the repository
+        scandir: '.'
+        # Format output (can be: gcc, tty, json, json1, quiet)
+        format: gcc
+        # Severity level (error, warning, info, style)
+        severity: warning
+        # Additional ShellCheck options
+        additional_files: 'xone_install_or_update.sh'

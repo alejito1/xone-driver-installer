@@ -261,7 +261,7 @@ if [[ $VERSION_DIFF == -1 ]]; then
 
     # Preserve the current working directory and arguments
     PWD=$(pwd)
-    ARGS="$@"
+    ARGS=("$@")
 
     # Replace the current script with the new version
     mv /tmp/xone_install_or_update.sh "$0"
@@ -274,7 +274,7 @@ if [[ $VERSION_DIFF == -1 ]]; then
         read -n 1 -s -r -p "Press any key to exit"
         exit 1
     }
-    exec bash "$0" "$ARGS"
+    exec bash "$0" "${ARGS[@]}"
 fi
 
 # Does the user have a sudo password set?
@@ -475,7 +475,7 @@ if [ -d "$XPAD_NOONE_LOCAL_REPO" ]; then
         # Uninstall the old xpad-noone driver
         modules=$(lsmod | grep '^xpad_noone' | cut -d ' ' -f 1 | tr '\n' ' ')
         if [ -n "$modules" ]; then
-            eval sudo modprobe -r -a $modules "$REDIRECT"
+            eval sudo modprobe -r -a "$modules" "$REDIRECT"
         fi
         if [ -n "$(dkms status xpad-noone)" ]; then
             eval sudo dkms remove -m xpad-noone -v "1.0" --all "$REDIRECT"
