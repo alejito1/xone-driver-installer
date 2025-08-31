@@ -1,6 +1,6 @@
 # ⚠️ Semi deprecated
 
-Unless you need Xbox 360 controller support then it's superseded by the driver's own [install script](https://github.com/dlundqvist/xone#steam-decksteamos)
+Unless you need Xbox 360 controller support which is handled by this script by installing [xpad-noone](https://github.com/forkymcforkface/xpad-noone) then it's mostly superseded by the driver's own [install script](https://github.com/dlundqvist/xone#steam-decksteamos), I believe you'll miss autoloading on restart though.
 
 # Donate
 
