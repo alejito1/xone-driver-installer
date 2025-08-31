@@ -560,6 +560,11 @@ if ! lsmod | grep -q xone_dongle; then
     echo "xone-dongle" | sudo tee /etc/modules-load.d/xone-dongle.conf >/dev/null 2>&1
 fi
 
+# Allow xpad to be loaded
+if [ -f /etc/modprobe.d/xone-blacklist.conf ]; then
+    sudo sed -i 's/blacklist xpad/#blacklist xpad/' /etc/modprobe.d/xone-blacklist.conf
+fi
+
 # Using lsmod check if xpad_noone is loaded, if not, load it
 if ! lsmod | grep -q xpad; then
     load_cmd="sudo modprobe -q xpad"
