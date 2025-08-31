@@ -18,6 +18,7 @@ Main changes at initial release versus [cdleveille's](https://gist.github.com/cd
 - Added various checks to prevent the script from redoing things that are already done
 - Ensure the module is loaded after install and on boot
 - Return `steamos-readonly` to its previous state after install
+- Allow Xbox 360 controllers by installing [xpad-noone](https://github.com/forkymcforkface/xpad-noone) which removes Xbox One support from the standard Linux `xpad` driver and allows it to coexist with `xone`
 
 # Installation ⬇️
 
