@@ -133,45 +133,15 @@ uninstall_xpad_noone() {
     fi
 }
 
-# Returns the SteamOS version
-detect_os_version() {
-    version=$(cat /etc/*-release | grep VERSION_ID)
-
-    if [[ $version == *"3.7"* ]]; then
-        echo "3.7"
-    elif [[ $version == *"3.6"* ]]; then
-        echo "3.6"
-    elif [[ $version == *"3.5"* ]]; then
-        echo "3.5"
-    else
-        echo "3.4"
-    fi
-}
-
 # Install linux headers (if not already installed)
 install_linux_headers() {
     echo -e "\e[1mChecking for linux headers...\e[0m"
     echo ""
-    version=$(detect_os_version)
-    kernel_headers="linux-neptune-headers"
+    linux=$(pacman -Qsq linux-neptune | grep -e "[0-9]$" | tail -n 1)
+    kernel_headers="$linux-headers"
 
     # 0 = true (remove), 1 = false (skip removal)
     remove_legacy_headers=1
-
-    case "$version" in
-    "3.5")
-        kernel_headers="linux-neptune-61-headers"
-        remove_legacy_headers=0
-        ;;
-    "3.6")
-        kernel_headers="linux-neptune-65-headers"
-        remove_legacy_headers=0
-        ;;
-    "3.7")
-        kernel_headers="linux-neptune-611-headers"
-        remove_legacy_headers=0
-        ;;
-    esac
 
     # Remove legacy 3.4 kernel headers package if installed
     if [[ $remove_legacy_headers -eq 0 ]] && pacman -Qs "linux-neptune-headers" >/dev/null; then
@@ -182,7 +152,7 @@ install_linux_headers() {
     fi
 
     if [[ $DEBUG == "true" ]]; then
-        echo "SteamOS $version detected using $kernel_headers package" "$REDIRECT"
+        echo "Using $kernel_headers package" "$REDIRECT"
     fi
 
     # Are the kernel headers already installed and up-to-date?
