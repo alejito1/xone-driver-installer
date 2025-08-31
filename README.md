@@ -12,9 +12,11 @@ Enjoying this script? Consider buying me a beer/coffee!
 
 First time setting up your Deck? You may enjoy my [setup guide](https://gist.github.com/SavageCore/eeb8b6ba032c0865e5c2a9eb8e073ab5). It'll get you started on Emulation.
 
-# Improvements 💪
+# xone Driver installation script for Steam Deck
 
-Main changes at initial release versus [cdleveille's](https://gist.github.com/cdleveille/e84c235c6e8c17042d35a7c0d92cdc96) original script:
+A fork of [cdleveille's](https://gist.github.com/cdleveille/e84c235c6e8c17042d35a7c0d92cdc96) script. With additional features and improvements.
+
+- Support for SteamOS 3.5+
 - Added zenity for a basic "GUI"
 - Added sudo check
 - Added various checks to prevent the script from redoing things that are already done
@@ -32,11 +34,11 @@ Main changes at initial release versus [cdleveille's](https://gist.github.com/cd
 
 ## Pairing 👫
 
-You can enable and disable pairing mode from the included Desktop shortcuts, saving you from getting up and pressing that button!
+You can enable (1) and disable (0) pairing mode with the included Desktop shortcuts, saving you from getting up and pressing that button! There's also the following command:
 
-After installation you may need to restart your Deck to get things working. Failing that try shutting down and waiting a minute before starting up again. Using the Desktop shortcut or command to enable pairing can also get things working.
+`echo 1 | sudo tee /sys/bus/usb/drivers/xone-dongle/*/pairing`
 
-`echo 0 | sudo tee /sys/bus/usb/drivers/xone-dongle/*/pairing`
+> Note: This currently seems to be broken, tracking [here](https://github.com/dlundqvist/xone/issues/111).
 
 # Updating 🔄
 
