@@ -108,7 +108,7 @@ uninstall_xone() {
 }
 
 install_xpad_noone() {
-    if [ -n "$(dkms status xpad)" ]; then
+    if [ -n "$(dkms status xpad-noone)" ]; then
         if [[ $DEBUG == "true" ]]; then
             echo "xpad-noone is already installed"
         fi
@@ -119,15 +119,15 @@ install_xpad_noone() {
     echo -e "\e[1mInstalling xpad-noone...\e[0m"
     echo ""
 
-    eval sudo modprobe -r xpad "$REDIRECT"
-    eval sudo cp -r "$XPAD_NOONE_LOCAL_REPO" /usr/src/xpad-$XPAD_NOONE_VERSION "$REDIRECT"
-    eval sudo dkms install -m xpad -v $XPAD_NOONE_VERSION "$REDIRECT"
+    eval sudo modprobe -r xpad-noone 2>/dev/null || true
+    eval sudo cp -r "$XPAD_NOONE_LOCAL_REPO" /usr/src/xpad-noone-$XPAD_NOONE_VERSION "$REDIRECT"
+    eval sudo dkms install -m xpad-noone -v $XPAD_NOONE_VERSION "$REDIRECT"
 }
 
 uninstall_xpad_noone() {
-    if [ -n "$(dkms status xpad)" ]; then
-        eval sudo dkms remove -m xpad -v "$XPAD_NOONE_VERSION" --all "$REDIRECT"
-        sudo rm -rf "/usr/src/xpad-$XPAD_NOONE_VERSION"
+    if [ -n "$(dkms status xpad-noone)" ]; then
+        eval sudo dkms remove -m xpad-noone -v "$XPAD_NOONE_VERSION" --all "$REDIRECT"
+        sudo rm -rf "/usr/src/xpad-noone-$XPAD_NOONE_VERSION"
     else
         echo 'Driver is not installed!'
     fi
@@ -530,16 +530,11 @@ if ! lsmod | grep -q xone_dongle; then
     echo "xone-dongle" | sudo tee /etc/modules-load.d/xone-dongle.conf >/dev/null 2>&1
 fi
 
-# Allow xpad to be loaded
-if [ -f /etc/modprobe.d/xone-blacklist.conf ]; then
-    sudo sed -i 's/blacklist xpad/#blacklist xpad/' /etc/modprobe.d/xone-blacklist.conf
-fi
-
 # Using lsmod check if xpad_noone is loaded, if not, load it
-if ! lsmod | grep -q xpad; then
-    load_cmd="sudo modprobe -q xpad"
+if ! lsmod | grep -q xpad_noone; then
+    load_cmd="sudo modprobe -q xpad-noone"
     if [[ $DEBUG == "true" ]]; then
-        load_cmd="sudo modprobe xpad"
+        load_cmd="sudo modprobe xpad-noone"
     fi
 
     # Load the xpad module, if it exists
@@ -549,8 +544,13 @@ if ! lsmod | grep -q xpad; then
         exit 1
     fi
 
-    sudo touch /etc/modules-load.d/xpad.conf
-    echo "xpad" | sudo tee /etc/modules-load.d/xpad.conf >/dev/null 2>&1
+    sudo touch /etc/modules-load.d/xpad-noone.conf
+    echo "xpad-noone" | sudo tee /etc/modules-load.d/xpad-noone.conf >/dev/null 2>&1
+fi
+
+# Ensure /etc/modules-load.d/xpad.conf does not exist
+if [ -f /etc/modules-load.d/xpad.conf ]; then
+    sudo rm /etc/modules-load.d/xpad.conf
 fi
 
 # Re enable steamos-readonly if it was enabled before
