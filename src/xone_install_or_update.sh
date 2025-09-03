@@ -3,7 +3,7 @@
 # by SavageCore, forked from cdleveille's original script on Gist.
 #
 # https://github.com/SavageCore/xone-steam-deck-installer
-# Script version 0.12.1
+# Script version 0.12.2
 
 # Set xone local repo location
 XONE_LOCAL_REPO="/home/deck/repos/xone"

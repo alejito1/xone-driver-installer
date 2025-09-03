@@ -1,5 +1,10 @@
 # Changelog
 
+### 0.12.2
+
+ - Update to support forkmcforkface's renamed xpad-noone, no longer conflicts with xpad
+ - Automatically determine the Linux version for downloading the correct headers package. Possibly no more updates each time there's a major SteamOS update!
+
 ### 0.12.1
 
  - Fix autoloading of new xpad-noone
