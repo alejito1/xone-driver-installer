@@ -206,6 +206,7 @@ install_pairing_shortcuts() {
 }
 
 echo -e "\e[1mxone install script by SavageCore\e[0m"
+echo -e "\e[1mVersion: $SCRIPT_VERSION\e[0m"
 echo -e "\e[1mhttps://github.com/SavageCore/xone-steam-deck-installer/\e[0m"
 echo "─────────────────────────────"
 echo ""
