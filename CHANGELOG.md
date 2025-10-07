@@ -1,5 +1,9 @@
 # Changelog
 
+### 0.12.3
+
+ - Fix xpad-noone version number to match the actual version
+
 ### 0.12.2
 
  - Update to support forkmcforkface's renamed xpad-noone, no longer conflicts with xpad
