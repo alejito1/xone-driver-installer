@@ -1,5 +1,9 @@
 # Changelog
 
+### 0.12.4
+
+ - Determine latest release from GitHub tags not by parsing the script
+
 ### 0.12.3
 
  - Fix xpad-noone version number to match the actual version
