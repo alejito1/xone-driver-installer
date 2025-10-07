@@ -16,6 +16,7 @@ XPAD_NOONE_REMOTE_REPO="https://github.com/forkymcforkface/xpad-noone"
 XPAD_NOONE_VERSION="1.0"
 
 # DO NOT EDIT BELOW THIS LINE
+SCRIPT_VERSION="0.12.3"
 KEEP_READ_ONLY="false"
 REDIRECT=">/dev/null 2>&1"
 DEBUG="false"
@@ -212,17 +213,21 @@ echo "This script will install the xone and xpad-noone drivers for the Xbox wire
 echo ""
 
 # Check if script is up to date
-CURRENT_VERSION=$(sed -n 's/^# Script version //p' "$0")
-REQUIRED_VERSION=$(curl -sSfL "https://github.com/SavageCore/xone-steam-deck-installer/releases/latest/download/xone_install_or_update.sh" | sed -n 's/^# Script version //p')
+# Get the latest release tag from GitHub API and remove leading 'v'
+REQUIRED_VERSION=$(curl -sSfL "https://api.github.com/repos/SavageCore/xone-steam-deck-installer/releases/latest" | grep -Po '"tag_name": *"\K.*?(?=")' | sed 's/^v//')
 
-VERSION_DIFF=$(compare_semver "$CURRENT_VERSION" "$REQUIRED_VERSION")
+# Only compare versions if both are non-empty
+if [[ -n "$SCRIPT_VERSION" ]] && [[ -n "$REQUIRED_VERSION" ]]; then
+    VERSION_DIFF=$(compare_semver "$SCRIPT_VERSION" "$REQUIRED_VERSION")
+else
+    VERSION_DIFF=0
+fi
 
-# if [[ "$CURRENT_VERSION" != "$REQUIRED_VERSION" ]]; then
 if [[ $VERSION_DIFF == -1 ]]; then
     echo -e "\e[1mYou have an outdated version of the script. Updating...\e[0m"
     echo ""
 
-    # Download the latest version of the script from the Gist
+    # Download the latest version of the script from the release assets
     curl -sSfL "https://github.com/SavageCore/xone-steam-deck-installer/releases/latest/download/xone_install_or_update.sh" >/tmp/xone_install_or_update.sh || {
         echo "Failed to download the latest version of the script. Aborting..."
         read -n 1 -s -r -p "Press any key to exit"
