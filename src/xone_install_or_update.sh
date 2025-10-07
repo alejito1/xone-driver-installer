@@ -13,7 +13,7 @@ XPAD_NOONE_LOCAL_REPO="/home/deck/repos/xpad-noone"
 # main repo: https://github.com/medusalix/xone
 XONE_REMOTE_REPO="https://github.com/dlundqvist/xone"
 XPAD_NOONE_REMOTE_REPO="https://github.com/forkymcforkface/xpad-noone"
-XPAD_NOONE_VERSION="0.4"
+XPAD_NOONE_VERSION="1.0"
 
 # DO NOT EDIT BELOW THIS LINE
 KEEP_READ_ONLY="false"
