@@ -1,7 +1,7 @@
 #!/bin/bash
 # Uninstall script for xone Steam Deck installer
 
-REPO_BASE_PATH="/home/deck/repos"
+REPO_BASE_PATH="/$HOME/repos"
 XONE_LOCAL_REPO="$REPO_BASE_PATH/xone"
 XPAD_NOONE_LOCAL_REPO="$REPO_BASE_PATH/xpad-noone"
 XPAD_NOONE_VERSION="1.0"

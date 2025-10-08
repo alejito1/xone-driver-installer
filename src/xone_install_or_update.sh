@@ -1,575 +1,754 @@
 #!/bin/bash
-# xone install or update script for SteamOS
-# by SavageCore, forked from cdleveille's original script on Gist.
+# xone install or update script - Multi-Distribution Support
+# Refactored version with improved error handling and cross-distro compatibility
+# Original by SavageCore, forked from cdleveille's original script
 #
 # https://github.com/SavageCore/xone-steam-deck-installer
-# Script version 0.12.4
+# Script version 0.13.0
 
-# Set xone local repo location
-XONE_LOCAL_REPO="/home/deck/repos/xone"
-XPAD_NOONE_LOCAL_REPO="/home/deck/repos/xpad-noone"
-# Set xone remote repo location
-# dlundqvist is maintaining a fork that contains PRs that have not been merged into the main repo
-# main repo: https://github.com/medusalix/xone
+set -o pipefail
+
+# Configuration
+XONE_LOCAL_REPO="$HOME/repos/xone"
+XPAD_NOONE_LOCAL_REPO="$HOME/repos/xpad-noone"
 XONE_REMOTE_REPO="https://github.com/dlundqvist/xone"
 XPAD_NOONE_REMOTE_REPO="https://github.com/forkymcforkface/xpad-noone"
 XPAD_NOONE_VERSION="1.0"
+SCRIPT_VERSION="0.13.0"
 
-# DO NOT EDIT BELOW THIS LINE
-SCRIPT_VERSION="0.12.4"
+# Runtime variables
 KEEP_READ_ONLY="false"
-REDIRECT=">/dev/null 2>&1"
 DEBUG="false"
 CURRENT_USER=$(whoami)
-REQUIRED_PACKAGES=("curl" "wget" "git" "gcc" "cabextract" "dkms" "libisl" "libmpc" "plymouth")
-# If --debug is passed as an argument, enable debug mode
-if [[ "$1" == "--debug" ]]; then
-    REDIRECT=""
-    DEBUG="true"
-fi
+DISTRO=""
+PACKAGE_MANAGER=""
+IS_STEAMOS="false"
 
-# compare_semver: Compare two Semantic Versioning (SemVer) strings.
-# Usage: compare_semver <version1> <version2>
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --debug)
+            DEBUG="true"
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# Logging functions
+log_info() {
+    echo -e "\e[1m$1\e[0m"
+}
+
+log_error() {
+    echo -e "\e[1;31mERROR: $1\e[0m" >&2
+}
+
+log_warning() {
+    echo -e "\e[1;33mWARNING: $1\e[0m"
+}
+
+log_debug() {
+    if [[ $DEBUG == "true" ]]; then
+        echo -e "\e[0;36mDEBUG: $1\e[0m"
+    fi
+}
+
+# Error handler
+error_exit() {
+    log_error "$1"
+    read -n 1 -s -r -p "Press any key to exit"
+    exit 1
+}
+
+# Compare semantic versions
 compare_semver() {
-    # Split version strings into major, minor, and patch segments.
+    local ver1_major ver1_minor ver1_patch
+    local ver2_major ver2_minor ver2_patch
+    
     ver1_major=$(echo "$1" | cut -d '.' -f 1)
     ver1_minor=$(echo "$1" | cut -d '.' -f 2)
     ver1_patch=$(echo "$1" | cut -d '.' -f 3)
-
+    
     ver2_major=$(echo "$2" | cut -d '.' -f 1)
     ver2_minor=$(echo "$2" | cut -d '.' -f 2)
     ver2_patch=$(echo "$2" | cut -d '.' -f 3)
-
-    # Compare major versions.
-    if [ "$ver1_major" -gt "$ver2_major" ]; then
-        echo "1"
-        return
-    elif [ "$ver1_major" -lt "$ver2_major" ]; then
-        echo "-1"
-        return
-    fi
-
-    # Compare minor versions.
-    if [ "$ver1_minor" -gt "$ver2_minor" ]; then
-        echo "1"
-        return
-    elif [ "$ver1_minor" -lt "$ver2_minor" ]; then
-        echo "-1"
-        return
-    fi
-
-    # Compare patch versions.
-    if [ "$ver1_patch" -gt "$ver2_patch" ]; then
-        echo "1"
-        return
-    elif [ "$ver1_patch" -lt "$ver2_patch" ]; then
-        echo "-1"
-        return
-    fi
-
-    # Versions are equal.
+    
+    if [ "$ver1_major" -gt "$ver2_major" ]; then echo "1"; return; fi
+    if [ "$ver1_major" -lt "$ver2_major" ]; then echo "-1"; return; fi
+    if [ "$ver1_minor" -gt "$ver2_minor" ]; then echo "1"; return; fi
+    if [ "$ver1_minor" -lt "$ver2_minor" ]; then echo "-1"; return; fi
+    if [ "$ver1_patch" -gt "$ver2_patch" ]; then echo "1"; return; fi
+    if [ "$ver1_patch" -lt "$ver2_patch" ]; then echo "-1"; return; fi
+    
     echo "0"
 }
 
-install_xone() {
-    if [ -n "$(dkms status xone)" ]; then
-        if [[ $DEBUG == "true" ]]; then
-            echo ""
-            echo "xone is already installed"
+# Detect distribution
+detect_distro() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DISTRO="$ID"
+        
+        # Check if SteamOS
+        if [[ "$ID" == "steamos" ]] || [[ "$NAME" =~ "SteamOS" ]]; then
+            IS_STEAMOS="true"
+            DISTRO="steamos"
         fi
-
-        return
-    fi
-
-    cd $XONE_LOCAL_REPO || {
-        echo "Failed to cd into xone repo. Aborting..."
-        read -n 1 -s -r -p "Press any key to exit"
-        exit 1
-    }
-
-    echo -e "\e[1mInstalling xone...\e[0m"
-    echo ""
-
-    # Run the xone install and get-firmware scripts
-    eval sudo ./install.sh --release "$REDIRECT"
-    echo -e "\e[1mGetting xone firmware...\e[0m"
-    echo ""
-    eval sudo install/firmware.sh --skip-disclaimer "$REDIRECT"
-}
-
-uninstall_xone() {
-    cd $XONE_LOCAL_REPO || {
-        echo "Failed to cd into xone repo. Aborting..."
-        read -n 1 -s -r -p "Press any key to exit"
-        exit 1
-    }
-
-    # Run the xone uninstall script
-    eval sudo ./uninstall.sh "$REDIRECT"
-}
-
-install_xpad_noone() {
-    if [ -n "$(dkms status xpad-noone)" ]; then
-        if [[ $DEBUG == "true" ]]; then
-            echo "xpad-noone is already installed"
-        fi
-
-        return
-    fi
-
-    echo -e "\e[1mInstalling xpad-noone...\e[0m"
-    echo ""
-
-    eval sudo modprobe -r xpad-noone 2>/dev/null || true
-    eval sudo cp -r "$XPAD_NOONE_LOCAL_REPO" /usr/src/xpad-noone-$XPAD_NOONE_VERSION "$REDIRECT"
-    eval sudo dkms install -m xpad-noone -v $XPAD_NOONE_VERSION "$REDIRECT"
-}
-
-uninstall_xpad_noone() {
-    if [ -n "$(dkms status xpad-noone)" ]; then
-        eval sudo dkms remove -m xpad-noone -v "$XPAD_NOONE_VERSION" --all "$REDIRECT"
-        sudo rm -rf "/usr/src/xpad-noone-$XPAD_NOONE_VERSION"
+        
+        log_debug "Detected distribution: $DISTRO"
     else
-        echo 'Driver is not installed!'
+        log_warning "Could not detect distribution, assuming generic Linux"
+        DISTRO="unknown"
     fi
 }
 
-# Install linux headers (if not already installed)
-install_linux_headers() {
-    echo -e "\e[1mChecking for linux headers...\e[0m"
-    echo ""
-    linux=$(pacman -Qsq linux-neptune | grep -e "[0-9]$" | tail -n 1)
-    kernel_headers="$linux-headers"
-
-    # 0 = true (remove), 1 = false (skip removal)
-    remove_legacy_headers=1
-
-    # Remove legacy 3.4 kernel headers package if installed
-    if [[ $remove_legacy_headers -eq 0 ]] && pacman -Qs "linux-neptune-headers" >/dev/null; then
-        if [[ $DEBUG == "true" ]]; then
-            echo "Found old 3.4 kernel package - removing"
+# Detect package manager with priority
+detect_package_manager() {
+    # For SteamOS, always use pacman
+    if [[ "$IS_STEAMOS" == "true" ]]; then
+        if command -v pacman &>/dev/null; then
+            PACKAGE_MANAGER="pacman"
+            log_debug "Using pacman (SteamOS detected)"
+            return 0
+        else
+            error_exit "SteamOS detected but pacman not found"
         fi
-        sudo pacman -R linux-neptune-headers --noconfirm >/dev/null
     fi
-
-    if [[ $DEBUG == "true" ]]; then
-        echo "Using $kernel_headers package" "$REDIRECT"
+    
+    # Priority-based detection for other distros
+    if command -v pacman &>/dev/null && [[ "$DISTRO" =~ ^(arch|manjaro|endeavouros)$ ]]; then
+        PACKAGE_MANAGER="pacman"
+    elif command -v apt &>/dev/null && [[ "$DISTRO" =~ ^(ubuntu|debian|linuxmint|pop)$ ]]; then
+        PACKAGE_MANAGER="apt"
+    elif command -v dnf &>/dev/null && [[ "$DISTRO" =~ ^(fedora|rhel|centos)$ ]]; then
+        PACKAGE_MANAGER="dnf"
+    elif command -v zypper &>/dev/null && [[ "$DISTRO" =~ ^(opensuse|sles)$ ]]; then
+        PACKAGE_MANAGER="zypper"
+    elif command -v apk &>/dev/null && [[ "$DISTRO" == "alpine" ]]; then
+        PACKAGE_MANAGER="apk"
+    elif command -v brew &>/dev/null; then
+        PACKAGE_MANAGER="brew"
+    else
+        error_exit "No supported package manager found"
     fi
-
-    # Are the kernel headers already installed and up-to-date?
-    if pacman -Qs "$kernel_headers" >/dev/null && ! pacman -Qu "$kernel_headers" >/dev/null; then
-        if [[ $DEBUG == "true" ]]; then
-            echo "Headers are already installed and up to date"
-        fi
-        return
-    fi
-
-    # If the headers are not installed or need updating, install them
-    echo -e "\e[1mInstalling required kernel headers, this may take a while...\e[0m"
-    echo ""
-    eval sudo pacman -Sy "$kernel_headers" --noconfirm >/dev/null
+    
+    log_debug "Using package manager: $PACKAGE_MANAGER"
 }
 
-install_base_devel() {
-    # Get list of base-devel packages
-    base_devel_packages=$(pacman -Sg base-devel | cut -d ' ' -f 2)
+# Get package name for current distro
+get_package_name() {
+    local generic_name="$1"
+    
+    case "$PACKAGE_MANAGER" in
+        apt)
+            case "$generic_name" in
+                gcc) echo "build-essential" ;;
+                libisl) echo "libisl23" ;;
+                libmpc) echo "libmpc3" ;;
+                cabextract) echo "cabextract" ;;
+                dkms) echo "dkms" ;;
+                plymouth) echo "plymouth" ;;
+                *) echo "$generic_name" ;;
+            esac
+            ;;
+        dnf|yum)
+            case "$generic_name" in
+                gcc) echo "gcc make kernel-devel" ;;
+                libisl) echo "isl" ;;
+                libmpc) echo "libmpc" ;;
+                *) echo "$generic_name" ;;
+            esac
+            ;;
+        *)
+            echo "$generic_name"
+            ;;
+    esac
+}
 
-    # Check if any of the base-devel packages are missing or need updating
-    for package in $base_devel_packages; do
-        if pacman -Qs "$package" >/dev/null; then
-            if pacman -Qu "$package" >/dev/null; then
+# Check if package is installed
+is_package_installed() {
+    local package="$1"
+    
+    case "$PACKAGE_MANAGER" in
+        pacman)
+            pacman -Qs "^$package$" &>/dev/null
+            ;;
+        apt)
+            dpkg -s "$package" &>/dev/null 2>&1
+            ;;
+        dnf|yum)
+            rpm -q "$package" &>/dev/null 2>&1
+            ;;
+        zypper)
+            rpm -q "$package" &>/dev/null 2>&1
+            ;;
+        apk)
+            apk info -e "$package" &>/dev/null 2>&1
+            ;;
+        brew)
+            brew list --formula | grep -qw "^$package\$"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Check if package has updates available
+has_package_update() {
+    local package="$1"
+    
+    case "$PACKAGE_MANAGER" in
+        pacman)
+            pacman -Qu 2>/dev/null | grep -qw "$package"
+            ;;
+        apt)
+            apt list --upgradable 2>/dev/null | grep -q "^$package/"
+            ;;
+        dnf|yum)
+            $PACKAGE_MANAGER check-update "$package" &>/dev/null
+            [ $? -eq 100 ]
+            ;;
+        zypper)
+            zypper list-updates 2>/dev/null | grep -qw "$package"
+            ;;
+        apk)
+            apk version "$package" 2>/dev/null | grep -q '<'
+            ;;
+        brew)
+            brew outdated | grep -qw "^$package\$"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Install a package
+install_package() {
+    local package="$1"
+    local actual_package=$(get_package_name "$package")
+    
+    log_debug "Installing $actual_package"
+    
+    case "$PACKAGE_MANAGER" in
+        pacman)
+            sudo pacman -S --noconfirm $actual_package
+            ;;
+        apt)
+            sudo apt install -y $actual_package
+            ;;
+        dnf)
+            sudo dnf install -y $actual_package
+            ;;
+        yum)
+            sudo yum install -y $actual_package
+            ;;
+        zypper)
+            sudo zypper install -y $actual_package
+            ;;
+        apk)
+            sudo apk add --no-cache $actual_package
+            ;;
+        brew)
+            brew install $actual_package
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Update a package
+update_package() {
+    local package="$1"
+    local actual_package=$(get_package_name "$package")
+    
+    log_debug "Updating $actual_package"
+    
+    case "$PACKAGE_MANAGER" in
+        pacman)
+            sudo pacman -S --noconfirm $actual_package
+            ;;
+        apt)
+            sudo apt install --only-upgrade -y $actual_package
+            ;;
+        dnf)
+            sudo dnf upgrade -y $actual_package
+            ;;
+        yum)
+            sudo yum update -y $actual_package
+            ;;
+        zypper)
+            sudo zypper update -y $actual_package
+            ;;
+        apk)
+            sudo apk upgrade $actual_package
+            ;;
+        brew)
+            brew upgrade $actual_package
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Install required packages
+install_required_packages() {
+    local packages=("curl" "wget" "git" "gcc" "cabextract" "dkms")
+    local packages_to_install=()
+    local packages_to_update=()
+    
+    # Add distro-specific packages
+    case "$PACKAGE_MANAGER" in
+        pacman)
+            packages+=("libisl" "libmpc" "plymouth")
+            ;;
+        apt)
+            packages+=("linux-headers-$(uname -r)")
+            ;;
+        dnf|yum)
+            packages+=("kernel-devel" "kernel-headers")
+            ;;
+    esac
+    
+    log_info "Checking required packages..."
+    echo ""
+    
+    for package in "${packages[@]}"; do
+        if is_package_installed "$package"; then
+            if has_package_update "$package"; then
                 packages_to_update+=("$package")
             fi
         else
             packages_to_install+=("$package")
         fi
     done
+    
+    # Install missing packages
+    if [ ${#packages_to_install[@]} -ne 0 ]; then
+        log_info "Installing required packages..."
+        echo ""
+        log_debug "Packages to install: ${packages_to_install[*]}"
+        
+        for package in "${packages_to_install[@]}"; do
+            if ! install_package "$package"; then
+                log_error "Failed to install $package"
+            fi
+        done
+    fi
+    
+    # Update packages
+    if [ ${#packages_to_update[@]} -ne 0 ]; then
+        log_info "Updating required packages..."
+        echo ""
+        log_debug "Packages to update: ${packages_to_update[*]}"
+        
+        for package in "${packages_to_update[@]}"; do
+            if ! update_package "$package"; then
+                log_error "Failed to update $package"
+            fi
+        done
+    fi
+    
+    if [ ${#packages_to_install[@]} -eq 0 ] && [ ${#packages_to_update[@]} -eq 0 ]; then
+        log_info "All required packages are already installed and up to date."
+    else
+        log_info "Required packages installed and updated successfully."
+    fi
+    echo ""
 }
 
-install_pairing_shortcuts() {
-    # If the pairing shortcuts are already installed (on desktop), exit
-    if [ -f ~/Desktop/enable-pairing.desktop ] && [ -f ~/Desktop/disable-pairing.desktop ]; then
-        if [[ $DEBUG == "true" ]]; then
-            echo "Pairing shortcuts already installed"
-        fi
-        return
+# Install Linux headers (SteamOS specific)
+install_linux_headers_steamos() {
+    if [[ "$IS_STEAMOS" != "true" ]]; then
+        return 0
     fi
-
-    # Download the pairing shortcuts
-    curl -sSfL "https://github.com/SavageCore/xone-steam-deck-installer/releases/latest/download/enable-pairing.desktop" >~/Desktop/enable-pairing.desktop || {
-        echo "Failed to download enable-pairing.desktop."
-    }
-
-    curl -sSfL "https://github.com/SavageCore/xone-steam-deck-installer/releases/latest/download/disable-pairing.desktop" >~/Desktop/disable-pairing.desktop || {
-        echo "Failed to download disable-pairing.desktop."
-    }
+    
+    log_info "Checking for linux headers..."
+    echo ""
+    
+    local linux=$(pacman -Qsq linux-neptune | grep -e "[0-9]$" | tail -n 1)
+    local kernel_headers="$linux-headers"
+    
+    log_debug "Using $kernel_headers package"
+    
+    if pacman -Qs "$kernel_headers" &>/dev/null && ! pacman -Qu "$kernel_headers" &>/dev/null; then
+        log_debug "Headers are already installed and up to date"
+        return 0
+    fi
+    
+    log_info "Installing required kernel headers, this may take a while..."
+    echo ""
+    sudo pacman -Sy "$kernel_headers" --noconfirm >/dev/null || error_exit "Failed to install kernel headers"
 }
 
-echo -e "\e[1mxone install script by SavageCore\e[0m"
-echo -e "\e[1mVersion: $SCRIPT_VERSION\e[0m"
-echo -e "\e[1mhttps://github.com/SavageCore/xone-steam-deck-installer/\e[0m"
-echo "─────────────────────────────"
-echo ""
-echo "This script will install the xone and xpad-noone drivers for the Xbox wireless dongle and controller"
-echo ""
-
-# Check if script is up to date
-# Get the latest release tag from GitHub API and remove leading 'v'
-REQUIRED_VERSION=$(curl -sSfL "https://api.github.com/repos/SavageCore/xone-steam-deck-installer/releases/latest" | grep -Po '"tag_name": *"\K.*?(?=")' | sed 's/^v//')
-
-# Only compare versions if both are non-empty
-if [[ -n "$SCRIPT_VERSION" ]] && [[ -n "$REQUIRED_VERSION" ]]; then
-    VERSION_DIFF=$(compare_semver "$SCRIPT_VERSION" "$REQUIRED_VERSION")
-else
-    VERSION_DIFF=0
-fi
-
-if [[ $VERSION_DIFF == -1 ]]; then
-    echo -e "\e[1mYou have an outdated version of the script. Updating...\e[0m"
-    echo ""
-
-    # Download the latest version of the script from the release assets
-    curl -sSfL "https://github.com/SavageCore/xone-steam-deck-installer/releases/latest/download/xone_install_or_update.sh" >/tmp/xone_install_or_update.sh || {
-        echo "Failed to download the latest version of the script. Aborting..."
-        read -n 1 -s -r -p "Press any key to exit"
-        exit 1
-    }
-
-    # Preserve the current working directory and arguments
-    PWD=$(pwd)
-    ARGS=("$@")
-
-    # Replace the current script with the new version
-    mv /tmp/xone_install_or_update.sh "$0"
-
-    read -n 1 -s -r -p "Press any key to relaunch the script..."
-    clear
-    # Re-run the script with the same environment variables and arguments
-    cd "$PWD" || {
-        echo "Failed to change directory. Aborting..."
-        read -n 1 -s -r -p "Press any key to exit"
-        exit 1
-    }
-    exec bash "$0" "${ARGS[@]}"
-fi
-
-# Does the user have a sudo password set?
-# If not, prompt them to set one
-if [ "$(passwd -S "$CURRENT_USER" | cut -d" " -f2)" != "P" ]; then
-    echo -e "\e[1mA sudo password is required, please enter one now to create it\e[0m"
-    PASSWORD=$(zenity --password --title="Password")
-    CONFIRM_PASSWORD=$(zenity --password --title="Confirm password")
-
-    # If the passwords don't match, exit
-    if [ "$PASSWORD" != "$CONFIRM_PASSWORD" ]; then
-        zenity --error --text="Passwords do not match\n\nExiting..." --title="Error"
-        exit 1
+# Setup SteamOS specific environment
+setup_steamos_environment() {
+    if [[ "$IS_STEAMOS" != "true" ]]; then
+        return 0
     fi
-
-    {
-        echo -e "$PASSWORD\n$PASSWORD" | passwd
-        # Elevate with sudo
-        echo -e "$PASSWORD" | sudo -S echo "" "$REDIRECT"
-    } &>/dev/null
-fi
-
-# Check if the user has sudo privileges
-# If not, prompt the user for a password
-if ! sudo -n true 2>/dev/null; then
-    if ! zenity --password --title="Sudo password" | eval sudo -S echo "" "$REDIRECT"; then
-        zenity --error --text="Sorry, you need to have sudo privileges to run this script." --title="Error"
-        exit 1
+    
+    # Rename fakeroot.conf to avoid error
+    if [ -f /etc/ld.so.conf.d/fakeroot.conf ]; then
+        sudo mv /etc/ld.so.conf.d/fakeroot.conf /etc/ld.so.conf.d/fakeroot.conf.bck
     fi
-fi
+    
+    # Disable read-only mode if enabled
+    if [ "$(sudo steamos-readonly status)" == "enabled" ]; then
+        sudo steamos-readonly disable
+        KEEP_READ_ONLY="true"
+    fi
+    
+    # Initialize pacman-key if needed
+    if ! pacman-key --list-keys >/dev/null 2>&1; then
+        log_info "Initialising pacman..."
+        echo ""
+        sudo pacman-key --init
+    fi
+    
+    log_debug "Refreshing pacman keys..."
+    sudo pacman-key --populate archlinux holo >/dev/null 2>&1
+}
 
-# Rename fakeroot.conf to avoid error
-if [ -f /etc/ld.so.conf.d/fakeroot.conf ]; then
-    sudo mv /etc/ld.so.conf.d/fakeroot.conf /etc/ld.so.conf.d/fakeroot.conf.bck
-fi
+# Restore SteamOS environment
+restore_steamos_environment() {
+    if [[ "$IS_STEAMOS" != "true" ]]; then
+        return 0
+    fi
+    
+    if [ "$KEEP_READ_ONLY" = "true" ]; then
+        sudo steamos-readonly enable
+    fi
+}
 
-# If output of `sudo steamos-readonly status` is "enabled", disable it
-if [ "$(sudo steamos-readonly status)" == "enabled" ]; then
-    sudo steamos-readonly disable
-    KEEP_READ_ONLY="true"
-fi
-
-# If pacman-key is not initialised, initialise it
-if ! eval pacman-key --list-keys >/dev/null 2>&1; then
-    echo -e "\e[1mInitialising pacman...\e[0m"
-    echo ""
-    sudo pacman-key --init
-fi
-
-echo "Refreshing pacman keys..."
-# Always populate archlinux and holo keys, quick enough to do every time
-# TODO: Only populate if not already populated
-sudo pacman-key --populate archlinux holo >/dev/null 2>&1
-
-# Install linux headers (if not already installed)
-install_linux_headers
-
-packages_to_install=()
-packages_to_update=()
-
-# Check if the required packages are installed and if they have updates
-for package in "${REQUIRED_PACKAGES[@]}"; do
-    if pacman -Qs "$package" >/dev/null; then
-        if pacman -Qu "$package" >/dev/null; then
-            packages_to_update+=("$package")
+# Clone or update git repository
+clone_or_update_repo() {
+    local repo_url="$1"
+    local local_path="$2"
+    local repo_name="$3"
+    
+    if [ -d "$local_path" ]; then
+        cd "$local_path" || error_exit "Failed to cd into $repo_name repo"
+        
+        # Check remote URL
+        local current_remote=$(git remote get-url origin)
+        if [[ "$current_remote" != "$repo_url" ]]; then
+            log_warning "Incorrect fork detected for $repo_name"
+            echo "  Current:  $current_remote"
+            echo "  Expected: $repo_url"
+            echo ""
+            log_info "Deleting and re-cloning correct fork..."
+            echo ""
+            
+            cd "$HOME/repos" || error_exit "Failed to cd into $HOME/repos"
+            rm -rf "$local_path"
+            
+            log_info "Cloning correct $repo_name fork..."
+            echo ""
+            git clone "$repo_url" "$local_path" || error_exit "Failed to clone $repo_name"
+            cd "$local_path" || error_exit "Failed to cd into newly cloned repo"
+            return 1  # Indicates reinstall needed
         fi
-    else
-        packages_to_install+=("$package")
-    fi
-done
-
-# Special case for base-devel, as it is a group, not a package
-install_base_devel
-
-# Are there any packages to install?
-if [ ! ${#packages_to_install[@]} -eq 0 ]; then
-    # Install the packages
-    echo -e "\e[1mInstalling required packages, this may take a while...\e[0m"
-    echo ""
-    if [[ $DEBUG == "true" ]]; then
-        echo "Packages to install: ${packages_to_install[*]}"
-    fi
-
-    # Install the packages
-    for package in "${packages_to_install[@]}"; do
-        if [[ $DEBUG == "true" ]]; then
-            echo "Installing $package" "$REDIRECT"
-        fi
-        sudo pacman -S "$package" --noconfirm >/dev/null
-    done
-fi
-
-# Are there any packages to update?
-if [ ! ${#packages_to_update[@]} -eq 0 ]; then
-    # Update the packages
-    echo -e "\e[1mUpdating required packages, this may take a while...\e[0m"
-    echo ""
-    if [[ $DEBUG == "true" ]]; then
-        echo "Packages to update: ${packages_to_update[*]}"
-    fi
-
-    # Update the packages
-    for package in "${packages_to_update[@]}"; do
-        if [[ $DEBUG == "true" ]]; then
-            echo "Updating $package" "$REDIRECT"
-        fi
-
-        sudo pacman -S "$package" --noconfirm >/dev/null
-    done
-fi
-
-if [ ${#packages_to_install[@]} -eq 0 ] && [ ${#packages_to_update[@]} -eq 0 ]; then
-    echo -e "\e[1mRequired packages installed and up to date\e[0m"
-    echo ""
-fi
-
-XONE_HAS_UPDATED=false
-XPAD_HAS_UPDATED=false
-
-# Does the xone local repo folder already exist?
-if [ -d "$XONE_LOCAL_REPO" ]; then
-    cd $XONE_LOCAL_REPO || {
-        echo "Failed to cd into xone repo. Aborting..."
-        read -n 1 -s -r -p "Press any key to exit"
-        exit 1
-    }
-
-    # Check if the correct fork is being used
-    current_remote=$(git remote get-url origin)
-    expected_remote="$XONE_REMOTE_REPO"
-
-    if [[ "$current_remote" != "$expected_remote" ]]; then
-        echo -e "\e[1;33mWarning: The current xone repo is not from the expected fork:\e[0m"
-        echo "  Current:  $current_remote"
-        echo "  Expected: $expected_remote"
+        
+        # Check for updates
+        log_info "Checking for $repo_name updates..."
         echo ""
-        echo -e "\e[1;33mDeleting the current xone repo and cloning the correct fork...\e[0m"
-        echo ""
-        cd "/home/deck/repos" || {
-            echo "Failed to cd into /home/deck/repos. Aborting..."
-            read -n 1 -s -r -p "Press any key to exit"
-            exit 1
-        }
-        rm -rf "$XONE_LOCAL_REPO"
-        echo -e "\e[1mCloning correct xone fork...\e[0m"
-        echo ""
-        eval git clone $XONE_REMOTE_REPO $XONE_LOCAL_REPO "$REDIRECT"
-        cd "$XONE_LOCAL_REPO" || {
-            echo "Failed to cd into newly cloned repo. Aborting..."
-            read -n 1 -s -r -p "Press any key to exit"
-            exit 1
-        }
-    fi
-
-    # ...if yes, run the uninstall script, and pull down any new updates from the remote repo
-    echo -e "\e[1mChecking for xone updates...\e[0m"
-    echo ""
-
-    # Ensure the repo is in a clean state for git pull
-    eval git reset --hard "$REDIRECT"
-    # Check for updates with git pull, and if there are updates, uninstall
-    git_output=$(eval git pull)
-
-    if [[ $git_output != *"Already up to date."* ]]; then
-        uninstall_xone
-        XPAD_HAS_UPDATED=true
-    else
-        echo "No updates available"
-    fi
-else
-    # ...if not, clone the repo
-    echo -e "\e[1mCloning xone repo...\e[0m"
-    echo ""
-    eval git clone $XONE_REMOTE_REPO $XONE_LOCAL_REPO "$REDIRECT"
-    cd $XONE_LOCAL_REPO || {
-        echo "Failed to clone xone repo. Aborting..."
-        read -n 1 -s -r -p "Press any key to exit"
-        exit 1
-    }
-fi
-
-# Does the xpad-noone local repo folder already exist?
-if [ -d "$XPAD_NOONE_LOCAL_REPO" ]; then
-    # ...if yes, check if it's the old medusalix repo
-    cd $XPAD_NOONE_LOCAL_REPO || {
-        echo "Failed to cd into xpad-noone repo. Aborting..."
-        read -n 1 -s -r -p "Press any key to exit"
-        exit 1
-    }
-
-    current_remote=$(git remote get-url origin)
-    old_remote="https://github.com/medusalix/xpad-noone"
-
-    if [[ "$current_remote" == "$old_remote" ]]; then
-        echo ""
-        echo -e "\e[1mDeleting the old xpad-noone repo and cloning the forkymcforkface fork...\e[0m"
-        echo ""
-        # Uninstall the old xpad-noone driver
-        modules=$(lsmod | grep '^xpad_noone' | cut -d ' ' -f 1 | tr '\n' ' ')
-        if [ -n "$modules" ]; then
-            eval sudo modprobe -r -a "$modules" "$REDIRECT"
-        fi
-        if [ -n "$(dkms status xpad-noone)" ]; then
-            eval sudo dkms remove -m xpad-noone -v "1.0" --all "$REDIRECT"
-            sudo rm -rf "/usr/src/xpad-noone-1.0"
-        fi
-        # Remove the old repo
-        cd "/home/deck/repos" || {
-            echo "Failed to cd into /home/deck/repos. Aborting..."
-            read -n 1 -s -r -p "Press any key to exit"
-            exit 1
-        }
-        rm -rf "$XPAD_NOONE_LOCAL_REPO"
-        rm -f /etc/modules-load.d/xpad-noone.conf
-        # Clone the new repo
-        echo -e "\e[1mCloning xpad-noone...\e[0m"
-        echo ""
-        eval git clone $XPAD_NOONE_REMOTE_REPO $XPAD_NOONE_LOCAL_REPO "$REDIRECT"
-        cd "$XPAD_NOONE_LOCAL_REPO" || {
-            echo "Failed to cd into newly cloned repo. Aborting..."
-            read -n 1 -s -r -p "Press any key to exit"
-            exit 1
-        }
-        XPAD_HAS_UPDATED=true
-    else
-        # Check for updates with git pull
-        echo -e "\e[1mChecking for xpad-noone updates...\e[0m"
-        echo ""
-        eval git reset --hard "$REDIRECT"
-        git_output=$(eval git pull)
+        git reset --hard >/dev/null 2>&1
+        local git_output=$(git pull)
+        
         if [[ $git_output != *"Already up to date."* ]]; then
-            uninstall_xpad_noone
-            XPAD_HAS_UPDATED=true
+            echo "Updates found"
+            return 1  # Indicates reinstall needed
         else
             echo "No updates available"
+            return 0
+        fi
+    else
+        # Clone new repo
+        mkdir -p "$HOME/repos"
+        log_info "Cloning $repo_name repo..."
+        echo ""
+        git clone "$repo_url" "$local_path" || error_exit "Failed to clone $repo_name"
+        cd "$local_path" || error_exit "Failed to cd into $repo_name repo"
+        return 1  # Indicates install needed
+    fi
+}
+
+# Install xone
+install_xone() {
+    if [ -n "$(dkms status xone)" ]; then
+        log_debug "xone is already installed"
+        return 0
+    fi
+    
+    cd "$XONE_LOCAL_REPO" || error_exit "Failed to cd into xone repo"
+    
+    log_info "Installing xone..."
+    echo ""
+    
+    if [[ $DEBUG == "true" ]]; then
+        sudo ./install.sh --release
+        log_info "Getting xone firmware..."
+        echo ""
+        sudo install/firmware.sh --skip-disclaimer
+    else
+        sudo ./install.sh --release >/dev/null 2>&1
+        log_info "Getting xone firmware..."
+        echo ""
+        sudo install/firmware.sh --skip-disclaimer >/dev/null 2>&1
+    fi
+}
+
+# Uninstall xone
+uninstall_xone() {
+    cd "$XONE_LOCAL_REPO" || error_exit "Failed to cd into xone repo"
+    
+    if [[ $DEBUG == "true" ]]; then
+        sudo ./uninstall.sh
+    else
+        sudo ./uninstall.sh >/dev/null 2>&1
+    fi
+}
+
+# Install xpad-noone
+install_xpad_noone() {
+    if [ -n "$(dkms status xpad-noone)" ]; then
+        log_debug "xpad-noone is already installed"
+        return 0
+    fi
+    
+    log_info "Installing xpad-noone..."
+    echo ""
+    
+    sudo modprobe -r xpad-noone 2>/dev/null || true
+    
+    if [[ $DEBUG == "true" ]]; then
+        sudo cp -r "$XPAD_NOONE_LOCAL_REPO" "/usr/src/xpad-noone-$XPAD_NOONE_VERSION"
+        sudo dkms install -m xpad-noone -v "$XPAD_NOONE_VERSION"
+    else
+        sudo cp -r "$XPAD_NOONE_LOCAL_REPO" "/usr/src/xpad-noone-$XPAD_NOONE_VERSION" >/dev/null 2>&1
+        sudo dkms install -m xpad-noone -v "$XPAD_NOONE_VERSION" >/dev/null 2>&1
+    fi
+}
+
+# Uninstall xpad-noone
+uninstall_xpad_noone() {
+    if [ -n "$(dkms status xpad-noone)" ]; then
+        if [[ $DEBUG == "true" ]]; then
+            sudo dkms remove -m xpad-noone -v "$XPAD_NOONE_VERSION" --all
+        else
+            sudo dkms remove -m xpad-noone -v "$XPAD_NOONE_VERSION" --all >/dev/null 2>&1
+        fi
+        sudo rm -rf "/usr/src/xpad-noone-$XPAD_NOONE_VERSION"
+    fi
+}
+
+# Load kernel module
+load_kernel_module() {
+    local module="$1"
+    local conf_file="$2"
+    
+    if ! lsmod | grep -q "$module"; then
+        log_debug "Loading $module module"
+        
+        if [[ $DEBUG == "true" ]]; then
+            sudo modprobe "$module" || error_exit "Failed to load $module module"
+        else
+            sudo modprobe -q "$module" || error_exit "Failed to load $module module"
+        fi
+        
+        sudo touch "/etc/modules-load.d/$conf_file"
+        echo "$module" | sudo tee "/etc/modules-load.d/$conf_file" >/dev/null 2>&1
+    fi
+}
+
+# Install pairing shortcuts (SteamOS only)
+install_pairing_shortcuts() {
+    if [[ "$IS_STEAMOS" != "true" ]]; then
+        return 0
+    fi
+    
+    if [ -f ~/Desktop/enable-pairing.desktop ] && [ -f ~/Desktop/disable-pairing.desktop ]; then
+        log_debug "Pairing shortcuts already installed"
+        return 0
+    fi
+    
+    curl -sSfL "https://github.com/SavageCore/xone-steam-deck-installer/releases/latest/download/enable-pairing.desktop" >~/Desktop/enable-pairing.desktop 2>/dev/null || {
+        log_warning "Failed to download enable-pairing.desktop"
+    }
+    
+    curl -sSfL "https://github.com/SavageCore/xone-steam-deck-installer/releases/latest/download/disable-pairing.desktop" >~/Desktop/disable-pairing.desktop 2>/dev/null || {
+        log_warning "Failed to download disable-pairing.desktop"
+    }
+}
+
+# Check for script updates
+check_script_updates() {
+    local required_version=$(curl -sSfL "https://api.github.com/repos/SavageCore/xone-steam-deck-installer/releases/latest" 2>/dev/null | grep -Po '"tag_name": *"\K.*?(?=")' | sed 's/^v//')
+    
+    if [[ -z "$required_version" ]]; then
+        log_debug "Could not check for script updates"
+        return 0
+    fi
+    
+    local version_diff=$(compare_semver "$SCRIPT_VERSION" "$required_version")
+    
+    if [[ $version_diff == -1 ]]; then
+        log_info "Script update available. Updating..."
+        echo ""
+        
+        curl -sSfL "https://github.com/SavageCore/xone-steam-deck-installer/releases/latest/download/xone_install_or_update.sh" >/tmp/xone_install_or_update.sh || {
+            log_error "Failed to download script update"
+            return 1
+        }
+        
+        local pwd=$(pwd)
+        local args=("$@")
+        
+        mv /tmp/xone_install_or_update.sh "$0"
+        chmod +x "$0"
+        
+        read -n 1 -s -r -p "Press any key to relaunch the script..."
+        clear
+        
+        cd "$pwd" || error_exit "Failed to change directory"
+        exec bash "$0" "${args[@]}"
+    fi
+}
+
+# Check sudo access
+check_sudo_access() {
+    # Check if sudo password is set
+    if [ "$(passwd -S "$CURRENT_USER" 2>/dev/null | cut -d" " -f2)" != "P" ]; then
+        if command -v zenity &>/dev/null; then
+            log_info "A sudo password is required"
+            local password=$(zenity --password --title="Password")
+            local confirm=$(zenity --password --title="Confirm password")
+            
+            if [ "$password" != "$confirm" ]; then
+                zenity --error --text="Passwords do not match\n\nExiting..." --title="Error"
+                exit 1
+            fi
+            
+            {
+                echo -e "$password\n$password" | passwd
+                echo -e "$password" | sudo -S echo "" >/dev/null 2>&1
+            } &>/dev/null
+        else
+            log_info "Please set a sudo password"
+            passwd
         fi
     fi
-else
-    # ...if not, clone the repo
-    echo -e "\e[1mCloning xpad-noone repo...\e[0m"
-    echo ""
-    eval git clone $XPAD_NOONE_REMOTE_REPO $XPAD_NOONE_LOCAL_REPO "$REDIRECT"
-    cd $XPAD_NOONE_LOCAL_REPO || {
-        echo "Failed to clone xpad-noone repo. Aborting..."
-        read -n 1 -s -r -p "Press any key to exit"
-        exit 1
-    }
-fi
+    
+    # Verify sudo access
+    if ! sudo -n true 2>/dev/null; then
+        if command -v zenity &>/dev/null; then
+            zenity --password --title="Sudo password" | sudo -S echo "" >/dev/null 2>&1 || {
+                zenity --error --text="Sudo privileges required" --title="Error"
+                exit 1
+            }
+        else
+            sudo -v || error_exit "Sudo privileges required"
+        fi
+    fi
+}
 
-# If debug, remove xone and xpad-noone to force a reinstall
-if [[ $DEBUG == "true" ]]; then
+# Main installation process
+main() {
+    log_info "xone install script by SavageCore"
+    log_info "Version: $SCRIPT_VERSION"
+    log_info "https://github.com/SavageCore/xone-steam-deck-installer/"
+    echo "─────────────────────────────────"
     echo ""
-    echo "Removing xone and xpad-noone to force a reinstall"
+    echo "This script will install the xone and xpad-noone drivers"
+    echo "for the Xbox wireless dongle and controller"
     echo ""
-    if [ $XONE_HAS_UPDATED = "false" ]; then
+    
+    # Detect system
+    detect_distro
+    detect_package_manager
+    
+    # Check for updates
+    check_script_updates "$@"
+    
+    # Verify sudo access
+    check_sudo_access
+    
+    # Setup environment
+    setup_steamos_environment
+    
+    # Install prerequisites
+    if [[ "$IS_STEAMOS" == "true" ]]; then
+        install_linux_headers_steamos
+    fi
+    
+    install_required_packages
+    
+    # Clone/update repositories
+    local xone_needs_install=false
+    local xpad_needs_install=false
+    
+    clone_or_update_repo "$XONE_REMOTE_REPO" "$XONE_LOCAL_REPO" "xone"
+    xone_needs_install=$?
+    
+    clone_or_update_repo "$XPAD_NOONE_REMOTE_REPO" "$XPAD_NOONE_LOCAL_REPO" "xpad-noone"
+    xpad_needs_install=$?
+    
+    # Reinstall if needed
+    if [[ $xone_needs_install -eq 1 ]]; then
         uninstall_xone
     fi
-    if [ $XPAD_HAS_UPDATED = "false" ]; then
+    
+    if [[ $xpad_needs_install -eq 1 ]]; then
         uninstall_xpad_noone
     fi
-fi
-
-# Run the xone install function
-install_xone
-
-# Run the xpad-noone install function
-install_xpad_noone
-
-# Using lsmod check if xone_dongle is loaded, if not, load it
-if ! lsmod | grep -q xone_dongle; then
-    load_cmd="sudo modprobe -q xone_dongle"
+    
+    # Debug mode: force reinstall
     if [[ $DEBUG == "true" ]]; then
-        load_cmd="sudo modprobe xone_dongle"
+        echo ""
+        log_debug "Debug mode: forcing reinstall"
+        echo ""
+        uninstall_xone
+        uninstall_xpad_noone
     fi
-
-    # Load the xone dongle module, if it exists
-    if ! $load_cmd; then
-        echo "Failed to load xone_dongle module. Aborting..."
-        read -n 1 -s -r -p "Press any key to exit"
-        exit 1
+    
+    # Install drivers
+    install_xone
+    install_xpad_noone
+    
+    # Load kernel modules
+    load_kernel_module "xone_dongle" "xone-dongle.conf"
+    load_kernel_module "xpad_noone" "xpad-noone.conf"
+    
+    # Remove conflicting config
+    if [ -f /etc/modules-load.d/xpad.conf ]; then
+        sudo rm /etc/modules-load.d/xpad.conf
     fi
-    sudo touch /etc/modules-load.d/xone-dongle.conf
-    echo "xone-dongle" | sudo tee /etc/modules-load.d/xone-dongle.conf >/dev/null 2>&1
-fi
-
-# Using lsmod check if xpad_noone is loaded, if not, load it
-if ! lsmod | grep -q xpad_noone; then
-    load_cmd="sudo modprobe -q xpad-noone"
+    
+    # Restore environment
+    restore_steamos_environment
+    
+    # Install shortcuts
+    install_pairing_shortcuts
+    
+    # Success message
+    if command -v zenity &>/dev/null; then
+        zenity --info --text="Done. You may now plug in your controller/adapter."
+    else
+        echo ""
+        log_info "Installation complete!"
+        echo "You may now plug in your controller/adapter."
+    fi
+    
     if [[ $DEBUG == "true" ]]; then
-        load_cmd="sudo modprobe xpad-noone"
-    fi
-
-    # Load the xpad module, if it exists
-    if ! $load_cmd; then
-        echo "Failed to load xpad module. Aborting..."
         read -n 1 -s -r -p "Press any key to exit"
-        exit 1
     fi
+}
 
-    sudo touch /etc/modules-load.d/xpad-noone.conf
-    echo "xpad-noone" | sudo tee /etc/modules-load.d/xpad-noone.conf >/dev/null 2>&1
-fi
-
-# Ensure /etc/modules-load.d/xpad.conf does not exist
-if [ -f /etc/modules-load.d/xpad.conf ]; then
-    sudo rm /etc/modules-load.d/xpad.conf
-fi
-
-# Re enable steamos-readonly if it was enabled before
-if [ $KEEP_READ_ONLY = "true" ]; then
-    sudo steamos-readonly enable
-fi
-
-install_pairing_shortcuts
-
-zenity --info \
-    --text="Done. You may now plug in your controller/adapter."
-
-# If debug wait for user input before exiting
-if [ $DEBUG = "true" ]; then
-    read -n 1 -s -r -p "Press any key to exit"
-fi
+# Run main function
+main "$@"
