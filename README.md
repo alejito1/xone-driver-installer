@@ -1,3 +1,5 @@
+This is  a fork of SavageCore's xone-steam-deck-installer all rights and donations will go to his pages.
+
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/SavageCore/xone-steam-deck-installer/test.yml?style=for-the-badge&label=ShellCheck)
  ![GitHub Downloads (specific asset, all releases)](https://img.shields.io/github/downloads/SavageCore/xone-steam-deck-installer/xone_install_or_update.sh?style=for-the-badge)
 
@@ -10,11 +12,11 @@ Enjoying this script? Consider buying me a beer/coffee!
 
 First time setting up your Deck? You may enjoy my [setup guide](https://gist.github.com/SavageCore/eeb8b6ba032c0865e5c2a9eb8e073ab5). It'll get you started on Emulation.
 
-# xone Driver installation script for Steam Deck
+# Universal xone Driver installation script for 
 
 A fork of [cdleveille's](https://gist.github.com/cdleveille/e84c235c6e8c17042d35a7c0d92cdc96) script. With additional features and improvements.
 
-- Support for SteamOS 3.5+
+- Support for most linux distros
 - Added zenity for a basic "GUI"
 - Added sudo check
 - Added various checks to prevent the script from redoing things that are already done
@@ -24,19 +26,12 @@ A fork of [cdleveille's](https://gist.github.com/cdleveille/e84c235c6e8c17042d35
 
 # Installation ⬇️
 
-1. Switch to [Desktop mode](https://help.steampowered.com/en/faqs/view/671A-4453-E8D2-323C)
-2. Launch Konsole
-3. Run `wget -O /tmp/bootstrap.sh https://github.com/SavageCore/xone-steam-deck-installer/releases/latest/download/bootstrap.sh && sh /tmp/bootstrap.sh`
+1. Clone or download the repo's zip
+2. You can clone and use the script with `wget -O /tmp/bootstrap.sh https://github.com/alejito1/xone-steam-deck-installer/releases/latest/download/bootstrap.sh && sh /tmp/bootstrap.sh` 
+3. If something breaks try launching Konsole and chmod 777 the scripts (just for being sure everything works)
+4. Install the driver
 
 ⚠️ If you have problems during install please read this [pinned issue](https://github.com/SavageCore/xone-steam-deck-installer/issues/1).
-
-## Pairing 👫
-
-You can enable (1) and disable (0) pairing mode with the included Desktop shortcuts, saving you from getting up and pressing that button! There's also the following command:
-
-`echo 1 | sudo tee /sys/bus/usb/drivers/xone-dongle/*/pairing`
-
-> Note: This currently seems to be broken, tracking [here](https://github.com/dlundqvist/xone/issues/111).
 
 # Updating 🔄
 
